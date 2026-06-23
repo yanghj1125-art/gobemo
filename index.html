@@ -15,31 +15,26 @@
             body { background-color: white; }
             .print-break { page-break-inside: avoid; }
         }
-        /* 클라우드 연동 상태 표시를 위한 애니메이션 */
-        .sync-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-10">
 
-    <div class="max-w-4xl mx-auto pt-6 px-4">
+    <div class="max-w-4xl mx-auto pt-6 px-4 relative">
+        <!-- 관리자 모드 토글 버튼 -->
+        <button id="adminBtn" onclick="toggleAdmin()" class="absolute top-6 right-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1.5 px-3 rounded text-xs transition-colors shadow-sm z-10">
+            🔒 관리자 로그인
+        </button>
+
         <!-- 헤더 -->
-        <div class="text-center mb-6">
+        <div class="text-center mb-6 pt-4">
             <div class="flex justify-center items-center gap-2 mb-2">
                 <h1 class="text-3xl font-bold text-indigo-700">🏸 고배모 경기 진행 🏸</h1>
-                <!-- 클라우드 연동 상태 아이콘 -->
                 <span id="cloudStatus" class="flex h-3 w-3 relative" title="오프라인 모드">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-3 w-3 bg-gray-500"></span>
                 </span>
             </div>
-            <p class="text-gray-600 text-sm">양 팀의 명단을 실력순(위에서부터 잘하는 순)으로 입력해주세요.</p>
-            <p class="text-indigo-500 text-xs mt-1 font-semibold">진행 상황이 실시간으로 다른 사용자와 공유됩니다.</p>
+            <p class="text-gray-600 text-sm">진행 상황이 실시간으로 공유됩니다.</p>
         </div>
 
         <!-- 입력 영역 -->
@@ -48,18 +43,19 @@
                 <!-- A팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-blue-600 mb-2">A팀 명단</label>
-                    <textarea id="teamA" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="1. 최강자&#10;2. 김배민&#10;3. 이민턴&#10;4. 박스매시" onchange="syncTextAreas()"></textarea>
+                    <textarea id="teamA" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-colors" placeholder="관리자 모드에서 입력 가능합니다." onchange="syncTextAreas()"></textarea>
                     <p class="text-xs text-gray-500 mt-1 text-right">총 인원: <span id="countA" class="font-bold">0</span>명</p>
                 </div>
                 <!-- B팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-red-600 mb-2">B팀 명단</label>
-                    <textarea id="teamB" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm" placeholder="1. 홍길동&#10;2. 이순신&#10;3. 강감찬&#10;4. 유관순" onchange="syncTextAreas()"></textarea>
+                    <textarea id="teamB" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm transition-colors" placeholder="관리자 모드에서 입력 가능합니다." onchange="syncTextAreas()"></textarea>
                     <p class="text-xs text-gray-500 mt-1 text-right">총 인원: <span id="countB" class="font-bold">0</span>명</p>
                 </div>
             </div>
 
-            <div class="mt-6 flex justify-center gap-4 no-print">
+            <!-- 관리자 전용 액션 버튼 -->
+            <div id="actionButtons" class="mt-6 flex justify-center gap-4 no-print" style="display: none;">
                 <button onclick="resetAll()" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-full shadow transition duration-200">
                     초기화
                 </button>
@@ -77,7 +73,7 @@
                     <p class="text-xs text-gray-500">1~3라운드: 자동 편성 / 4~5라운드: 수동 오더</p>
                 </div>
                 <div class="flex items-center gap-3 mt-2 sm:mt-0">
-                    <button onclick="generateBracket()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold py-1.5 px-4 rounded shadow-sm text-sm no-print transition-colors">
+                    <button id="rebuildBtn" onclick="generateBracket()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold py-1.5 px-4 rounded shadow-sm text-sm no-print transition-colors" style="display: none;">
                         🔄 다시 편성
                     </button>
                 </div>
@@ -91,8 +87,6 @@
         <!-- 실시간 경기 결과 -->
         <div id="finalResultArea" class="hidden mt-12 bg-white rounded-xl shadow-lg p-6 border-t-4 border-indigo-500 print-break">
             <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">🏆 실시간 경기 결과</h2>
-            
-            <!-- 팀 종합 스코어 -->
             <div class="flex justify-center items-center gap-8 mb-8">
                 <div class="text-center">
                     <div class="text-lg font-bold text-blue-600">A팀</div>
@@ -104,8 +98,6 @@
                     <div id="scoreB" class="text-5xl font-black text-red-700 mt-2">0</div>
                 </div>
             </div>
-
-            <!-- 개인별 성적 표 -->
             <div>
                 <h3 class="text-lg font-bold text-gray-700 mb-3">개인별 승률 (승률 순)</h3>
                 <div class="overflow-x-auto">
@@ -120,11 +112,22 @@
                                 <th scope="col" class="px-4 py-3 text-center">승률</th>
                             </tr>
                         </thead>
-                        <tbody id="playerStatsBody">
-                            <!-- 선수 스탯 렌더링 영역 -->
-                        </tbody>
+                        <tbody id="playerStatsBody"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 커스텀 모달창 (alert/prompt/confirm 대체용) -->
+    <div id="customModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform scale-100">
+            <h3 id="modalTitle" class="text-xl font-bold text-gray-900 mb-2">알림</h3>
+            <p id="modalMessage" class="text-gray-600 mb-5 text-sm whitespace-pre-wrap"></p>
+            <input type="password" id="modalInput" class="hidden w-full border border-gray-300 rounded-lg p-2.5 mb-5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow" autocomplete="off" placeholder="비밀번호 입력">
+            <div class="flex justify-end gap-3">
+                <button id="modalCancel" class="hidden px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">취소</button>
+                <button id="modalConfirm" class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow transition-colors">확인</button>
             </div>
         </div>
     </div>
@@ -135,31 +138,129 @@
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 전역 상태 관리
-        window.globalTournamentState = {
-            rounds: [],
-            teamA: [],
-            teamB: []
+        // 커스텀 모달 로직
+        window.showModal = function({ type = 'alert', title, message }) {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('customModal');
+                const tEl = document.getElementById('modalTitle');
+                const mEl = document.getElementById('modalMessage');
+                const inputEl = document.getElementById('modalInput');
+                const btnCancel = document.getElementById('modalCancel');
+                const btnConfirm = document.getElementById('modalConfirm');
+
+                tEl.innerText = title;
+                mEl.innerText = message;
+                modal.classList.remove('hidden');
+
+                if (type === 'prompt') {
+                    inputEl.classList.remove('hidden');
+                    inputEl.value = '';
+                    setTimeout(() => inputEl.focus(), 50);
+                    btnCancel.classList.remove('hidden');
+                } else if (type === 'confirm') {
+                    inputEl.classList.add('hidden');
+                    btnCancel.classList.remove('hidden');
+                } else {
+                    inputEl.classList.add('hidden');
+                    btnCancel.classList.add('hidden');
+                    setTimeout(() => btnConfirm.focus(), 50);
+                }
+
+                const cleanup = () => {
+                    modal.classList.add('hidden');
+                    btnConfirm.onclick = null;
+                    btnCancel.onclick = null;
+                    inputEl.onkeyup = null;
+                };
+
+                btnConfirm.onclick = () => {
+                    cleanup();
+                    if (type === 'prompt') resolve(inputEl.value);
+                    else resolve(true);
+                };
+
+                btnCancel.onclick = () => {
+                    cleanup();
+                    resolve(null); // 취소 시 null
+                };
+
+                inputEl.onkeyup = (e) => {
+                    if (e.key === 'Enter') btnConfirm.click();
+                    if (e.key === 'Escape') btnCancel.click();
+                };
+            });
         };
+
+        window.cAlert = (msg) => window.showModal({ type: 'alert', title: '알림', message: msg });
+        window.cConfirm = (msg) => window.showModal({ type: 'confirm', title: '확인', message: msg });
+        window.cPrompt = (msg) => window.showModal({ type: 'prompt', title: '비밀번호 입력', message: msg });
+
+        // 전역 상태
+        window.globalTournamentState = { rounds: [], teamA: [], teamB: [] };
+        window.isAdmin = false;
 
         // Firebase 인스턴스
         let db = null;
         let auth = null;
-        let isOnline = false;
-        let lastLocalUpdate = 0; // 무한 루프(내가 쓴 데이터를 다시 덮어쓰는 현상) 방지용
+        let lastLocalUpdate = 0;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'github-badminton-app';
 
-        // ----------------------------------------------------
-        // [중요] Github Pages에 배포할 때는 아래 코드를 본인의 Firebase 설정으로 바꿔주세요.
-        // ----------------------------------------------------
+        window.updateUIForRole = function() {
+            const taA = document.getElementById('teamA');
+            const taB = document.getElementById('teamB');
+            
+            taA.readOnly = !window.isAdmin;
+            taB.readOnly = !window.isAdmin;
+            
+            if (window.isAdmin) {
+                taA.classList.remove('bg-gray-100', 'text-gray-500');
+                taB.classList.remove('bg-gray-100', 'text-gray-500');
+            } else {
+                taA.classList.add('bg-gray-100', 'text-gray-500');
+                taB.classList.add('bg-gray-100', 'text-gray-500');
+            }
+
+            document.getElementById('actionButtons').style.display = window.isAdmin ? 'flex' : 'none';
+            document.getElementById('rebuildBtn').style.display = window.isAdmin ? 'block' : 'none';
+
+            const adminBtn = document.getElementById('adminBtn');
+            if (window.isAdmin) {
+                adminBtn.innerHTML = '🔓 관리자 (로그아웃)';
+                adminBtn.className = 'absolute top-6 right-4 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold py-1.5 px-3 rounded text-xs transition-colors shadow-sm z-10';
+            } else {
+                adminBtn.innerHTML = '🔒 관리자 로그인';
+                adminBtn.className = 'absolute top-6 right-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1.5 px-3 rounded text-xs transition-colors shadow-sm z-10';
+            }
+        };
+
+        window.toggleAdmin = async function() {
+            if (window.isAdmin) {
+                window.isAdmin = false;
+                await window.cAlert("관리자 모드가 해제되었습니다. (보기 전용 모드)");
+            } else {
+                const pw = await window.cPrompt("관리자 비밀번호를 입력하세요.");
+                if (pw === "5555") {
+                    window.isAdmin = true;
+                    await window.cAlert("관리자 모드로 접속되었습니다. 대진표 수정 및 승패 입력이 가능합니다.");
+                } else if (pw !== null) {
+                    await window.cAlert("비밀번호가 일치하지 않습니다.");
+                    return;
+                } else {
+                    return;
+                }
+            }
+            window.updateUIForRole();
+            window.renderBracket(); 
+        };
+
+        window.updateUIForRole();
+
         async function initFirebase() {
             try {
                 let firebaseConfig = null;
                 if (typeof __firebase_config !== 'undefined') {
-                    // 현재 테스트 환경(Canvas)용 자동 설정
                     firebaseConfig = JSON.parse(__firebase_config);
                 } else {
-                    // ★ GitHub 배포 시 여기에 Firebase 콘솔에서 발급받은 내용을 넣으세요 ★
                     firebaseConfig = {
                         apiKey: "AIzaSyCGll0kXrfimezwKbQZlTDeycnFIOJVuKw",
                         authDomain: "gobemo-c3bd9.firebaseapp.com",
@@ -167,7 +268,7 @@
                         storageBucket: "gobemo-c3bd9.firebasestorage.app",
                         messagingSenderId: "224722111446",
                         appId: "1:224722111446:web:27ab9387d6a66d3a04f277",
-                        measurementId: "G-04FGRJVJ2W",
+                        measurementId: "G-04FGRJVJ2W"
                     };
                 }
 
@@ -183,39 +284,29 @@
                     }
 
                     onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            listenToCloudData();
-                        }
+                        if (user) listenToCloudData();
                     });
                 }
             } catch (error) {
-                console.error("Firebase 초기화 에러:", error);
+                console.error("Firebase Init Error:", error);
             }
         }
 
-        // 앱 진입 시 Firebase 시작
         initFirebase();
 
-        // 클라우드 데이터 실시간 수신 (다른 사람의 변경사항 반영)
         function listenToCloudData() {
             if (!db) return;
-            // Firestore 문서는 반드시 짝수 개의 경로를 가져야 합니다. (컬렉션/문서/컬렉션/문서)
-            // 기존 5개였던 경로를 6개로 수정했습니다: artifacts(컬렉션) > appId(문서) > public(컬렉션) > data(문서) > badminton(컬렉션) > current(문서)
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badminton', 'current');
             
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    // 연동 아이콘 파란색(활성)으로 변경
                     document.getElementById('cloudStatus').innerHTML = `
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>`;
                     
-                    // 방금 내가 업데이트 한 내역이면 충돌 방지를 위해 패스 (1초 이내)
                     if (Date.now() - lastLocalUpdate < 1000) return;
 
                     const data = docSnap.data();
-                    
-                    // 텍스트 영역 동기화 (내가 지금 입력 중인게 아닐 때만)
                     if (document.activeElement.id !== 'teamA' && data.textA !== undefined) {
                         document.getElementById('teamA').value = data.textA;
                         window.updateCount('teamA', 'countA');
@@ -225,7 +316,7 @@
                         window.updateCount('teamB', 'countB');
                     }
 
-                    if (data.state && data.state.rounds.length > 0) {
+                    if (data.state && data.state.rounds && data.state.rounds.length > 0) {
                         window.globalTournamentState = data.state;
                         window.renderBracket();
                         window.updateRealTimeResults();
@@ -235,54 +326,41 @@
                         window.globalTournamentState = { rounds: [], teamA: [], teamB: [] };
                     }
                 }
-            }, (error) => {
-                console.error("데이터 수신 에러:", error);
-            });
+            }, (error) => console.error("Data Sync Error:", error));
         }
 
-        // 내 변경사항을 클라우드에 전송 (실시간 공유)
         window.syncToCloud = async function() {
-            if (!db) return;
+            if (!db || !window.isAdmin) return;
             lastLocalUpdate = Date.now();
             try {
-                // 저장 경로도 위와 동일하게 짝수(6개) 경로로 맞춥니다.
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badminton', 'current');
-                const textA = document.getElementById('teamA').value;
-                const textB = document.getElementById('teamB').value;
-                
                 await setDoc(docRef, {
                     state: window.globalTournamentState,
-                    textA: textA,
-                    textB: textB,
+                    textA: document.getElementById('teamA').value,
+                    textB: document.getElementById('teamB').value,
                     updatedAt: Date.now()
                 });
-            } catch(e) {
-                console.error("데이터 전송 실패:", e);
-            }
+            } catch(e) { console.error("Sync Failed:", e); }
         };
 
-        window.syncTextAreas = function() {
-            window.syncToCloud();
-        };
+        window.syncTextAreas = function() { window.syncToCloud(); };
 
-        // 초기화 (리셋)
-        window.resetAll = function() {
-            if(confirm("입력된 명단과 진행 중인 경기 결과가 모두 삭제되며, 접속 중인 모든 사람에게 반영됩니다. 초기화하시겠습니까?")) {
+        window.resetAll = async function() {
+            if (!window.isAdmin) return;
+            const proceed = await window.cConfirm("입력된 명단과 진행 중인 경기 결과가 모두 삭제되며, 접속 중인 모든 사람에게 반영됩니다.\n초기화하시겠습니까?");
+            if (proceed) {
                 document.getElementById('teamA').value = '';
                 document.getElementById('teamB').value = '';
                 window.updateCount('teamA', 'countA');
                 window.updateCount('teamB', 'countB');
-                
                 document.getElementById('resultArea').classList.add('hidden');
                 document.getElementById('finalResultArea').classList.add('hidden');
-                
                 window.globalTournamentState = { rounds: [], teamA: [], teamB: [] };
                 window.scrollTo({ top: 0, behavior: 'smooth' });
                 window.syncToCloud();
             }
         }
 
-        // 텍스트 카운트
         window.updateCount = function(inputId, countId) {
             const lines = document.getElementById(inputId).value.split('\n').filter(line => line.trim() !== '');
             document.getElementById(countId).innerText = lines.length;
@@ -299,7 +377,6 @@
         function fillRoundSlots(team, requiredSlots, playCounts) {
             let selected = [...team];
             selected.forEach(p => playCounts[p.name]++);
-
             let extrasNeeded = requiredSlots - selected.length;
             if (extrasNeeded > 0) {
                 let availableExtras = [...team].sort((a, b) => {
@@ -316,8 +393,7 @@
         }
 
         function formPairs(players, history) {
-            let pairs = [];
-            let unassigned = [...players];
+            let pairs = []; let unassigned = [...players];
             while (unassigned.length >= 2) {
                 let p1 = unassigned.shift();
                 let bestP2Idx = 0, bestScore = Infinity;
@@ -335,20 +411,25 @@
             return pairs;
         }
 
-        // 대진표 생성
-        window.generateBracket = function() {
+        window.generateBracket = async function() {
+            if (!window.isAdmin) return;
+            
             let hasStarted = false;
             for (let r of window.globalTournamentState.rounds) {
-                for (let m of r) { if (m.winner !== null) hasStarted = true; }
+                let matches = r.matches;
+                for (let m of matches) { if (m.winner !== null) hasStarted = true; }
             }
 
-            if (hasStarted && !confirm("이미 승패가 기록된 경기가 있습니다. 재편성 시 기존 기록이 모두 삭제됩니다. 진행하시겠습니까?")) return;
+            if (hasStarted) {
+                const proceed = await window.cConfirm("이미 승패가 기록된 경기가 있습니다. 재편성 시 기존 기록이 모두 삭제됩니다.\n진행하시겠습니까?");
+                if (!proceed) return;
+            }
 
             const teamA = getTeamData('teamA');
             const teamB = getTeamData('teamB');
 
             if (teamA.length < 2 || teamB.length < 2) {
-                alert("각 팀에 최소 2명 이상의 명단을 입력해주세요.");
+                await window.cAlert("각 팀에 최소 2명 이상의 명단을 입력해주세요.");
                 return;
             }
 
@@ -364,13 +445,11 @@
             teamB.forEach(p => playCountsB[p.name] = 0);
             const partnerHistoryA = {}; const partnerHistoryB = {};
 
-            const rounds = [];
+            const rounds = []; // Firebase Nested Array 방지를 위해 [{ matches: [] }] 구조 사용
 
             for (let r = 1; r <= 5; r++) {
                 let roundMatches = [];
-                
                 if (r <= 3) {
-                    // 1,2,3 라운드: 자동 생성 (실력별 매칭)
                     let roundPlayersA = fillRoundSlots(teamA, slotsPerTeam, playCountsA);
                     let roundPlayersB = fillRoundSlots(teamB, slotsPerTeam, playCountsB);
                     let pairsA = formPairs(roundPlayersA, partnerHistoryA);
@@ -380,25 +459,18 @@
                     let sortedPairsB = pairsB.map(pair => ({ pair, avgRank: (pair[0].originalRank + pair[1].originalRank)/2 })).sort((a,b)=>a.avgRank-b.avgRank);
                     
                     for (let i = 0; i < matchesPerRound; i++) {
-                        roundMatches.push({
-                            teamA: sortedPairsA[i].pair,
-                            teamB: sortedPairsB[i].pair,
-                            winner: null,
-                            isManual: false
-                        });
+                        roundMatches.push({ teamA: sortedPairsA[i].pair, teamB: sortedPairsB[i].pair, winner: null, isManual: false });
                     }
                 } else {
-                    // 4, 5 라운드: 수동 편성 (오더 싸움을 위해 빈칸으로 생성)
                     for (let i = 0; i < matchesPerRound; i++) {
                         roundMatches.push({
                             teamA: [{name: '', originalRank: 99}, {name: '', originalRank: 99}],
                             teamB: [{name: '', originalRank: 99}, {name: '', originalRank: 99}],
-                            winner: null,
-                            isManual: true
+                            winner: null, isManual: true
                         });
                     }
                 }
-                rounds.push(roundMatches);
+                rounds.push({ matches: roundMatches });
             }
 
             window.globalTournamentState.rounds = rounds;
@@ -407,30 +479,25 @@
             window.syncToCloud();
         }
 
-        // 수동 편성 선수 업데이트
         window.updateManualPlayer = function(rIdx, mIdx, teamStr, pIdx, newName) {
-            let match = window.globalTournamentState.rounds[rIdx][mIdx];
+            if (!window.isAdmin) return;
+            let match = window.globalTournamentState.rounds[rIdx].matches[mIdx];
             let teamList = teamStr === 'A' ? window.globalTournamentState.teamA : window.globalTournamentState.teamB;
-            
-            // 이름으로 기존 객체 검색, 없으면 빈 객체 할당
             let playerObj = teamList.find(p => p.name === newName) || { name: newName, originalRank: 99 };
             
-            if (teamStr === 'A') {
-                match.teamA[pIdx] = playerObj;
-            } else {
-                match.teamB[pIdx] = playerObj;
-            }
+            if (teamStr === 'A') match.teamA[pIdx] = playerObj;
+            else match.teamB[pIdx] = playerObj;
             
             window.updateRealTimeResults();
             window.syncToCloud();
         };
 
-        // 렌더링
         window.renderBracket = function() {
             const container = document.getElementById('roundsContainer');
             container.innerHTML = ''; 
 
-            window.globalTournamentState.rounds.forEach((matches, roundIndex) => {
+            window.globalTournamentState.rounds.forEach((roundObj, roundIndex) => {
+                const matches = roundObj.matches;
                 const roundDiv = document.createElement('div');
                 roundDiv.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print-break';
                 
@@ -450,58 +517,60 @@
                     matchNum.className = 'text-xs text-gray-400 font-semibold w-full md:w-16 text-center md:text-left mb-2 md:mb-0';
                     matchNum.innerText = `Game ${matchIndex + 1}`;
 
-                    // 드롭다운 생성 헬퍼
                     const makeSelect = (teamStr, pIdx) => {
                         const members = teamStr === 'A' ? window.globalTournamentState.teamA : window.globalTournamentState.teamB;
                         const currName = teamStr === 'A' ? match.teamA[pIdx].name : match.teamB[pIdx].name;
-                        let html = `<select class="border border-gray-300 rounded p-1 text-sm bg-white shadow-sm outline-none focus:ring focus:ring-indigo-200 w-24" onchange="updateManualPlayer(${roundIndex}, ${matchIndex}, '${teamStr}', ${pIdx}, this.value)">`;
+                        const styleClass = window.isAdmin ? 'bg-white focus:ring focus:ring-indigo-200 cursor-pointer border border-gray-300 shadow-sm' : 'bg-gray-100 text-gray-600 border-none appearance-none cursor-default font-semibold shadow-none';
+                        const disabledAttr = window.isAdmin ? '' : 'disabled';
+                        
+                        let html = `<select class="rounded p-1 text-sm outline-none w-24 text-center ${styleClass}" onchange="updateManualPlayer(${roundIndex}, ${matchIndex}, '${teamStr}', ${pIdx}, this.value)" ${disabledAttr}>`;
                         html += `<option value="">선택</option>`;
-                        members.forEach(m => {
-                            html += `<option value="${m.name}" ${m.name === currName ? 'selected' : ''}>${m.name}</option>`;
-                        });
+                        members.forEach(m => { html += `<option value="${m.name}" ${m.name === currName ? 'selected' : ''}>${m.name}</option>`; });
                         html += `</select>`;
                         return html;
                     };
 
-                    // A팀
+                    const makeButton = (teamStr) => {
+                        const btn = document.createElement('button');
+                        if (window.isAdmin) {
+                            btn.className = `px-3 py-1 text-xs font-bold rounded shadow-sm border transition-colors ${match.winner === teamStr ? (teamStr === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-red-600 text-white border-red-600') : `bg-white ${teamStr === 'A' ? 'text-blue-600 border-blue-200 hover:bg-blue-50' : 'text-red-600 border-red-200 hover:bg-red-50'}`}`;
+                            btn.innerText = match.winner === teamStr ? '승리 ★' : '승리';
+                            btn.onclick = () => window.toggleWinner(roundIndex, matchIndex, teamStr);
+                        } else {
+                            if (match.winner === teamStr) {
+                                btn.className = `px-3 py-1 text-xs font-bold rounded shadow-sm border text-white cursor-default ${teamStr === 'A' ? 'bg-blue-600 border-blue-600' : 'bg-red-600 border-red-600'}`;
+                                btn.innerText = '승리 ★';
+                            } else {
+                                btn.className = 'px-3 py-1 text-xs font-bold rounded opacity-0 cursor-default pointer-events-none';
+                                btn.innerText = '승리'; 
+                            }
+                        }
+                        return btn;
+                    };
+
+                    // A팀 영역
                     const teamAbox = document.createElement('div');
                     teamAbox.className = 'flex-1 flex items-center justify-center md:justify-end gap-3 w-full';
-                    const btnA = document.createElement('button');
-                    btnA.className = `px-3 py-1 text-xs font-bold rounded shadow-sm border transition-colors ${match.winner === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`;
-                    btnA.innerText = match.winner === 'A' ? '승리 ★' : '승리';
-                    btnA.onclick = () => window.toggleWinner(roundIndex, matchIndex, 'A');
-
                     const namesA = document.createElement('div');
-                    namesA.className = `text-center md:text-right font-medium flex items-center gap-1 ${match.winner === 'B' ? 'opacity-50' : ''}`;
-                    if (match.isManual) {
-                        namesA.innerHTML = `${makeSelect('A', 0)} <span class="text-gray-400 text-xs">-</span> ${makeSelect('A', 1)}`;
-                    } else {
-                        namesA.innerHTML = `<span class="text-blue-800">${match.teamA[0].name}</span> <span class="text-gray-400 text-xs mx-0.5">&</span> <span class="text-blue-800">${match.teamA[1].name}</span>`;
-                    }
-                    teamAbox.appendChild(btnA);
+                    namesA.className = `text-center md:text-right font-medium flex items-center gap-1 ${match.winner === 'B' ? 'opacity-40 grayscale' : ''}`;
+                    if (match.isManual) namesA.innerHTML = `${makeSelect('A', 0)} <span class="text-gray-400 text-xs">-</span> ${makeSelect('A', 1)}`;
+                    else namesA.innerHTML = `<span class="text-blue-800">${match.teamA[0].name}</span> <span class="text-gray-400 text-xs mx-0.5">&</span> <span class="text-blue-800">${match.teamA[1].name}</span>`;
+                    teamAbox.appendChild(makeButton('A'));
                     teamAbox.appendChild(namesA);
 
                     const vsMark = document.createElement('div');
                     vsMark.className = 'bg-gray-200 text-gray-600 text-xs font-bold px-2 py-1 rounded-md hidden md:block mx-4';
                     vsMark.innerText = 'VS';
 
-                    // B팀
+                    // B팀 영역
                     const teamBbox = document.createElement('div');
                     teamBbox.className = 'flex-1 flex items-center justify-center md:justify-start gap-3 w-full';
                     const namesB = document.createElement('div');
-                    namesB.className = `text-center md:text-left font-medium flex items-center gap-1 ${match.winner === 'A' ? 'opacity-50' : ''}`;
-                    if (match.isManual) {
-                        namesB.innerHTML = `${makeSelect('B', 0)} <span class="text-gray-400 text-xs">-</span> ${makeSelect('B', 1)}`;
-                    } else {
-                        namesB.innerHTML = `<span class="text-red-800">${match.teamB[0].name}</span> <span class="text-gray-400 text-xs mx-0.5">&</span> <span class="text-red-800">${match.teamB[1].name}</span>`;
-                    }
-                    const btnB = document.createElement('button');
-                    btnB.className = `px-3 py-1 text-xs font-bold rounded shadow-sm border transition-colors ${match.winner === 'B' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200 hover:bg-red-50'}`;
-                    btnB.innerText = match.winner === 'B' ? '승리 ★' : '승리';
-                    btnB.onclick = () => window.toggleWinner(roundIndex, matchIndex, 'B');
-
+                    namesB.className = `text-center md:text-left font-medium flex items-center gap-1 ${match.winner === 'A' ? 'opacity-40 grayscale' : ''}`;
+                    if (match.isManual) namesB.innerHTML = `${makeSelect('B', 0)} <span class="text-gray-400 text-xs">-</span> ${makeSelect('B', 1)}`;
+                    else namesB.innerHTML = `<span class="text-red-800">${match.teamB[0].name}</span> <span class="text-gray-400 text-xs mx-0.5">&</span> <span class="text-red-800">${match.teamB[1].name}</span>`;
                     teamBbox.appendChild(namesB);
-                    teamBbox.appendChild(btnB);
+                    teamBbox.appendChild(makeButton('B'));
 
                     matchItem.appendChild(matchNum);
                     matchItem.appendChild(teamAbox);
@@ -518,13 +587,13 @@
             document.getElementById('finalResultArea').classList.remove('hidden');
         }
 
-        window.toggleWinner = function(roundIdx, matchIdx, teamStr) {
-            let match = window.globalTournamentState.rounds[roundIdx][matchIdx];
+        window.toggleWinner = async function(roundIdx, matchIdx, teamStr) {
+            if (!window.isAdmin) return;
+            let match = window.globalTournamentState.rounds[roundIdx].matches[matchIdx];
             
-            // 4, 5라운드 빈칸 승리 처리 방지
             if (match.isManual) {
                 if (!match.teamA[0].name || !match.teamA[1].name || !match.teamB[0].name || !match.teamB[1].name) {
-                    alert("출전 선수를 모두 선택한 후 승패를 입력해주세요.");
+                    await window.cAlert("출전 선수를 모두 선택한 후 승패를 입력해주세요.");
                     return;
                 }
             }
@@ -544,14 +613,12 @@
             window.globalTournamentState.teamA.forEach(p => { stats[`A-${p.name}`] = { team: 'A', name: p.name, play: 0, win: 0, lose: 0 }; });
             window.globalTournamentState.teamB.forEach(p => { stats[`B-${p.name}`] = { team: 'B', name: p.name, play: 0, win: 0, lose: 0 }; });
 
-            window.globalTournamentState.rounds.forEach(round => {
-                round.forEach(match => {
-                    // 선택된 선수만 카운트 (수동 오더 빈칸 제외)
+            window.globalTournamentState.rounds.forEach(roundObj => {
+                const matches = roundObj.matches;
+                matches.forEach(match => {
                     let a1 = match.teamA[0].name; let a2 = match.teamA[1].name;
                     let b1 = match.teamB[0].name; let b2 = match.teamB[1].name;
                     
-                    let isReady = a1 && a2 && b1 && b2;
-
                     if (a1 && stats[`A-${a1}`]) stats[`A-${a1}`].play++;
                     if (a2 && stats[`A-${a2}`]) stats[`A-${a2}`].play++;
                     if (b1 && stats[`B-${b1}`]) stats[`B-${b1}`].play++;
