@@ -160,17 +160,15 @@
                     firebaseConfig = JSON.parse(__firebase_config);
                 } else {
                     // ★ GitHub 배포 시 여기에 Firebase 콘솔에서 발급받은 내용을 넣으세요 ★
-                    // firebaseConfig = {
-                    //     apiKey: "AIzaSyCGll0kXrfimezwKbQZlTDeycnFIOJVuKw",
-                    //     authDomain: "gobemo-c3bd9.firebaseapp.com",
-                    //     projectId: "gobemo-c3bd9",
-                    //     storageBucket: "gobemo-c3bd9.firebasestorage.app",
-                    //     messagingSenderId: "224722111446",
-                    //     appId: "1:224722111446:web:27ab9387d6a66d3a04f277"
-                    //     measurementId: "G-04FGRJVJ2W"
-
+                    firebaseConfig = {
+                        apiKey: "AIzaSyCGll0kXrfimezwKbQZlTDeycnFIOJVuKw",
+                        authDomain: "gobemo-c3bd9.firebaseapp.com",
+                        projectId: "gobemo-c3bd9",
+                        storageBucket: "gobemo-c3bd9.firebasestorage.app",
+                        messagingSenderId: "224722111446",
+                        appId: "1:224722111446:web:27ab9387d6a66d3a04f277",
+                        measurementId: "G-04FGRJVJ2W",
                     };
-                    console.warn("GitHub Pages에서 실시간 연동을 하려면 Firebase 설정이 필요합니다.");
                 }
 
                 if (firebaseConfig) {
@@ -201,7 +199,9 @@
         // 클라우드 데이터 실시간 수신 (다른 사람의 변경사항 반영)
         function listenToCloudData() {
             if (!db) return;
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badmintonTournamentCurrent');
+            // Firestore 문서는 반드시 짝수 개의 경로를 가져야 합니다. (컬렉션/문서/컬렉션/문서)
+            // 기존 5개였던 경로를 6개로 수정했습니다: artifacts(컬렉션) > appId(문서) > public(컬렉션) > data(문서) > badminton(컬렉션) > current(문서)
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badminton', 'current');
             
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -245,7 +245,8 @@
             if (!db) return;
             lastLocalUpdate = Date.now();
             try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badmintonTournamentCurrent');
+                // 저장 경로도 위와 동일하게 짝수(6개) 경로로 맞춥니다.
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badminton', 'current');
                 const textA = document.getElementById('teamA').value;
                 const textB = document.getElementById('teamB').value;
                 
