@@ -3,27 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>고배모 경기 진행 대진표</title>
+    <title>고배모 경기 진행 대진표 (실시간 공유)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         textarea {
             resize: vertical;
-            min-height: 200px;
+            min-height: 150px;
         }
         @media print {
             .no-print { display: none !important; }
             body { background-color: white; }
             .print-break { page-break-inside: avoid; }
         }
+        /* 클라우드 연동 상태 표시를 위한 애니메이션 */
+        .sync-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-10">
 
-    <div class="max-w-4xl mx-auto pt-8 px-4">
+    <div class="max-w-4xl mx-auto pt-6 px-4">
         <!-- 헤더 -->
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-indigo-700 mb-2">🏸 고배모 경기 진행 🏸</h1>
+        <div class="text-center mb-6">
+            <div class="flex justify-center items-center gap-2 mb-2">
+                <h1 class="text-3xl font-bold text-indigo-700">🏸 고배모 경기 진행 🏸</h1>
+                <!-- 클라우드 연동 상태 아이콘 -->
+                <span id="cloudStatus" class="flex h-3 w-3 relative" title="오프라인 모드">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-gray-500"></span>
+                </span>
+            </div>
             <p class="text-gray-600 text-sm">양 팀의 명단을 실력순(위에서부터 잘하는 순)으로 입력해주세요.</p>
+            <p class="text-indigo-500 text-xs mt-1 font-semibold">진행 상황이 실시간으로 다른 사용자와 공유됩니다.</p>
         </div>
 
         <!-- 입력 영역 -->
@@ -32,13 +48,13 @@
                 <!-- A팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-blue-600 mb-2">A팀 명단</label>
-                    <textarea id="teamA" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="1. 최강자&#10;2. 김배민&#10;3. 이민턴&#10;4. 박스매시"></textarea>
+                    <textarea id="teamA" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="1. 최강자&#10;2. 김배민&#10;3. 이민턴&#10;4. 박스매시" onchange="syncTextAreas()"></textarea>
                     <p class="text-xs text-gray-500 mt-1 text-right">총 인원: <span id="countA" class="font-bold">0</span>명</p>
                 </div>
                 <!-- B팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-red-600 mb-2">B팀 명단</label>
-                    <textarea id="teamB" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="1. 홍길동&#10;2. 이순신&#10;3. 강감찬&#10;4. 유관순"></textarea>
+                    <textarea id="teamB" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm" placeholder="1. 홍길동&#10;2. 이순신&#10;3. 강감찬&#10;4. 유관순" onchange="syncTextAreas()"></textarea>
                     <p class="text-xs text-gray-500 mt-1 text-right">총 인원: <span id="countB" class="font-bold">0</span>명</p>
                 </div>
             </div>
@@ -56,9 +72,11 @@
         <!-- 대진표 결과 출력 영역 -->
         <div id="resultArea" class="hidden">
             <div class="flex flex-col sm:flex-row justify-between items-end mb-4 print-break">
-                <h2 class="text-2xl font-bold text-gray-800 mb-2 sm:mb-0">📋 경기 대진표</h2>
-                <div class="flex items-center gap-3">
-                    <span class="text-sm text-gray-500 hidden sm:inline">총 5라운드 진행</span>
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-1">📋 경기 대진표</h2>
+                    <p class="text-xs text-gray-500">1~3라운드: 자동 편성 / 4~5라운드: 수동 오더</p>
+                </div>
+                <div class="flex items-center gap-3 mt-2 sm:mt-0">
                     <button onclick="generateBracket()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-semibold py-1.5 px-4 rounded shadow-sm text-sm no-print transition-colors">
                         🔄 다시 편성
                     </button>
@@ -70,7 +88,7 @@
             </div>
         </div>
 
-        <!-- 실시간 경기 결과 (항상 하단에 표시) -->
+        <!-- 실시간 경기 결과 -->
         <div id="finalResultArea" class="hidden mt-12 bg-white rounded-xl shadow-lg p-6 border-t-4 border-indigo-500 print-break">
             <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">🏆 실시간 경기 결과</h2>
             
@@ -109,51 +127,174 @@
                 </div>
             </div>
         </div>
-
     </div>
 
-    <script>
+    <!-- Firebase SDK (모듈 방식) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // 전역 상태 관리
-        let globalTournamentState = {
+        window.globalTournamentState = {
             rounds: [],
             teamA: [],
             teamB: []
         };
 
-        // 초기화 (리셋) 기능
-        function resetAll() {
-            if(confirm("입력된 명단과 진행 중인 경기 결과가 모두 삭제됩니다. 초기화하시겠습니까?")) {
+        // Firebase 인스턴스
+        let db = null;
+        let auth = null;
+        let isOnline = false;
+        let lastLocalUpdate = 0; // 무한 루프(내가 쓴 데이터를 다시 덮어쓰는 현상) 방지용
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'github-badminton-app';
+
+        // ----------------------------------------------------
+        // [중요] Github Pages에 배포할 때는 아래 코드를 본인의 Firebase 설정으로 바꿔주세요.
+        // ----------------------------------------------------
+        async function initFirebase() {
+            try {
+                let firebaseConfig = null;
+                if (typeof __firebase_config !== 'undefined') {
+                    // 현재 테스트 환경(Canvas)용 자동 설정
+                    firebaseConfig = JSON.parse(__firebase_config);
+                } else {
+                    // ★ GitHub 배포 시 여기에 Firebase 콘솔에서 발급받은 내용을 넣으세요 ★
+                    // firebaseConfig = {
+                    //     apiKey: "AIzaSyCGll0kXrfimezwKbQZlTDeycnFIOJVuKw",
+                    //     authDomain: "gobemo-c3bd9.firebaseapp.com",
+                    //     projectId: "gobemo-c3bd9",
+                    //     storageBucket: "gobemo-c3bd9.firebasestorage.app",
+                    //     messagingSenderId: "224722111446",
+                    //     appId: "1:224722111446:web:27ab9387d6a66d3a04f277"
+                    //     measurementId: "G-04FGRJVJ2W"
+
+                    };
+                    console.warn("GitHub Pages에서 실시간 연동을 하려면 Firebase 설정이 필요합니다.");
+                }
+
+                if (firebaseConfig) {
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            listenToCloudData();
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Firebase 초기화 에러:", error);
+            }
+        }
+
+        // 앱 진입 시 Firebase 시작
+        initFirebase();
+
+        // 클라우드 데이터 실시간 수신 (다른 사람의 변경사항 반영)
+        function listenToCloudData() {
+            if (!db) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badmintonTournamentCurrent');
+            
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    // 연동 아이콘 파란색(활성)으로 변경
+                    document.getElementById('cloudStatus').innerHTML = `
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>`;
+                    
+                    // 방금 내가 업데이트 한 내역이면 충돌 방지를 위해 패스 (1초 이내)
+                    if (Date.now() - lastLocalUpdate < 1000) return;
+
+                    const data = docSnap.data();
+                    
+                    // 텍스트 영역 동기화 (내가 지금 입력 중인게 아닐 때만)
+                    if (document.activeElement.id !== 'teamA' && data.textA !== undefined) {
+                        document.getElementById('teamA').value = data.textA;
+                        window.updateCount('teamA', 'countA');
+                    }
+                    if (document.activeElement.id !== 'teamB' && data.textB !== undefined) {
+                        document.getElementById('teamB').value = data.textB;
+                        window.updateCount('teamB', 'countB');
+                    }
+
+                    if (data.state && data.state.rounds.length > 0) {
+                        window.globalTournamentState = data.state;
+                        window.renderBracket();
+                        window.updateRealTimeResults();
+                    } else {
+                        document.getElementById('resultArea').classList.add('hidden');
+                        document.getElementById('finalResultArea').classList.add('hidden');
+                        window.globalTournamentState = { rounds: [], teamA: [], teamB: [] };
+                    }
+                }
+            }, (error) => {
+                console.error("데이터 수신 에러:", error);
+            });
+        }
+
+        // 내 변경사항을 클라우드에 전송 (실시간 공유)
+        window.syncToCloud = async function() {
+            if (!db) return;
+            lastLocalUpdate = Date.now();
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'badmintonTournamentCurrent');
+                const textA = document.getElementById('teamA').value;
+                const textB = document.getElementById('teamB').value;
+                
+                await setDoc(docRef, {
+                    state: window.globalTournamentState,
+                    textA: textA,
+                    textB: textB,
+                    updatedAt: Date.now()
+                });
+            } catch(e) {
+                console.error("데이터 전송 실패:", e);
+            }
+        };
+
+        window.syncTextAreas = function() {
+            window.syncToCloud();
+        };
+
+        // 초기화 (리셋)
+        window.resetAll = function() {
+            if(confirm("입력된 명단과 진행 중인 경기 결과가 모두 삭제되며, 접속 중인 모든 사람에게 반영됩니다. 초기화하시겠습니까?")) {
                 document.getElementById('teamA').value = '';
                 document.getElementById('teamB').value = '';
-                updateCount('teamA', 'countA');
-                updateCount('teamB', 'countB');
+                window.updateCount('teamA', 'countA');
+                window.updateCount('teamB', 'countB');
                 
                 document.getElementById('resultArea').classList.add('hidden');
                 document.getElementById('finalResultArea').classList.add('hidden');
                 
-                globalTournamentState = { rounds: [], teamA: [], teamB: [] };
+                window.globalTournamentState = { rounds: [], teamA: [], teamB: [] };
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+                window.syncToCloud();
             }
         }
 
-        // 인원 수 업데이트
-        function updateCount(inputId, countId) {
+        // 텍스트 카운트
+        window.updateCount = function(inputId, countId) {
             const lines = document.getElementById(inputId).value.split('\n').filter(line => line.trim() !== '');
             document.getElementById(countId).innerText = lines.length;
         }
 
-        document.getElementById('teamA').addEventListener('input', () => updateCount('teamA', 'countA'));
-        document.getElementById('teamB').addEventListener('input', () => updateCount('teamB', 'countB'));
+        document.getElementById('teamA').addEventListener('input', () => window.updateCount('teamA', 'countA'));
+        document.getElementById('teamB').addEventListener('input', () => window.updateCount('teamB', 'countB'));
 
         function getTeamData(inputId) {
             const lines = document.getElementById(inputId).value.split('\n').filter(line => line.trim() !== '');
-            return lines.map((name, index) => ({
-                name: name.trim(),
-                originalRank: index
-            }));
+            return lines.map((name, index) => ({ name: name.trim(), originalRank: index }));
         }
 
-        // 슬롯 채우기 (홀수 인원 시 추가 배정)
         function fillRoundSlots(team, requiredSlots, playCounts) {
             let selected = [...team];
             selected.forEach(p => playCounts[p.name]++);
@@ -161,12 +302,9 @@
             let extrasNeeded = requiredSlots - selected.length;
             if (extrasNeeded > 0) {
                 let availableExtras = [...team].sort((a, b) => {
-                    if (playCounts[a.name] !== playCounts[b.name]) {
-                        return playCounts[a.name] - playCounts[b.name];
-                    }
+                    if (playCounts[a.name] !== playCounts[b.name]) return playCounts[a.name] - playCounts[b.name];
                     return a.originalRank - b.originalRank;
                 });
-
                 for (let i = 0; i < extrasNeeded; i++) {
                     let p = availableExtras[i % availableExtras.length];
                     selected.push({ ...p, isExtra: true });
@@ -176,29 +314,18 @@
             return selected.sort((a, b) => a.originalRank - b.originalRank);
         }
 
-        // 파트너 매칭 알고리즘
         function formPairs(players, history) {
             let pairs = [];
             let unassigned = [...players];
-
             while (unassigned.length >= 2) {
                 let p1 = unassigned.shift();
-                let bestP2Idx = 0;
-                let bestScore = Infinity;
-
+                let bestP2Idx = 0, bestScore = Infinity;
                 for (let i = 0; i < unassigned.length; i++) {
                     let p2 = unassigned[i];
                     let pairKey = [p1.name, p2.name].sort().join("|");
-                    let timesPartnered = history[pairKey] || 0;
-                    let rankDiff = Math.abs(p1.originalRank - p2.originalRank);
-                    let score = (timesPartnered * 10000) + rankDiff;
-                    
-                    if (score < bestScore) {
-                        bestScore = score;
-                        bestP2Idx = i;
-                    }
+                    let score = ((history[pairKey] || 0) * 10000) + Math.abs(p1.originalRank - p2.originalRank);
+                    if (score < bestScore) { bestScore = score; bestP2Idx = i; }
                 }
-
                 let p2 = unassigned.splice(bestP2Idx, 1)[0];
                 pairs.push([p1, p2]);
                 let finalKey = [p1.name, p2.name].sort().join("|");
@@ -207,22 +334,14 @@
             return pairs;
         }
 
-        // 대진 생성
-        function generateBracket() {
+        // 대진표 생성
+        window.generateBracket = function() {
             let hasStarted = false;
-            if (globalTournamentState.rounds.length > 0) {
-                for (let r of globalTournamentState.rounds) {
-                    for (let m of r) {
-                        if (m.winner !== null) hasStarted = true;
-                    }
-                }
+            for (let r of window.globalTournamentState.rounds) {
+                for (let m of r) { if (m.winner !== null) hasStarted = true; }
             }
 
-            if (hasStarted) {
-                if (!confirm("이미 승패가 기록된 경기가 있습니다. 대진을 다시 편성하면 기존 점수 기록이 모두 초기화됩니다. 진행하시겠습니까?")) {
-                    return;
-                }
-            }
+            if (hasStarted && !confirm("이미 승패가 기록된 경기가 있습니다. 재편성 시 기존 기록이 모두 삭제됩니다. 진행하시겠습니까?")) return;
 
             const teamA = getTeamData('teamA');
             const teamB = getTeamData('teamB');
@@ -232,77 +351,91 @@
                 return;
             }
 
-            globalTournamentState.teamA = teamA;
-            globalTournamentState.teamB = teamB;
+            window.globalTournamentState.teamA = teamA;
+            window.globalTournamentState.teamB = teamB;
 
             const maxTeamSize = Math.max(teamA.length, teamB.length);
             const matchesPerRound = Math.ceil(maxTeamSize / 2);
             const slotsPerTeam = matchesPerRound * 2;
 
-            const playCountsA = {};
-            const playCountsB = {};
+            const playCountsA = {}; const playCountsB = {};
             teamA.forEach(p => playCountsA[p.name] = 0);
             teamB.forEach(p => playCountsB[p.name] = 0);
-
-            const partnerHistoryA = {};
-            const partnerHistoryB = {};
+            const partnerHistoryA = {}; const partnerHistoryB = {};
 
             const rounds = [];
 
             for (let r = 1; r <= 5; r++) {
-                let roundPlayersA = fillRoundSlots(teamA, slotsPerTeam, playCountsA);
-                let roundPlayersB = fillRoundSlots(teamB, slotsPerTeam, playCountsB);
-
-                let pairsA = formPairs(roundPlayersA, partnerHistoryA);
-                let pairsB = formPairs(roundPlayersB, partnerHistoryB);
-
-                const addAvgRank = (pairs) => {
-                    return pairs.map(pair => {
-                        let avg = (pair[0].originalRank + pair[1].originalRank) / 2;
-                        return { pair, avgRank: avg };
-                    }).sort((a, b) => a.avgRank - b.avgRank);
-                };
-
-                let sortedPairsA = addAvgRank(pairsA);
-                let sortedPairsB = addAvgRank(pairsB);
-
-                // 4라운드, 5라운드 매칭 다변화 (비슷한 실력대에서 상대 스왑)
-                if (r === 4 || r === 5) {
-                    for (let i = 0; i < sortedPairsB.length - 1; i += 2) {
-                        let temp = sortedPairsB[i];
-                        sortedPairsB[i] = sortedPairsB[i+1];
-                        sortedPairsB[i+1] = temp;
-                    }
-                }
-
                 let roundMatches = [];
-                for (let i = 0; i < matchesPerRound; i++) {
-                    roundMatches.push({
-                        teamA: sortedPairsA[i].pair,
-                        teamB: sortedPairsB[i].pair,
-                        winner: null // 승패 기록용 상태 추가
-                    });
+                
+                if (r <= 3) {
+                    // 1,2,3 라운드: 자동 생성 (실력별 매칭)
+                    let roundPlayersA = fillRoundSlots(teamA, slotsPerTeam, playCountsA);
+                    let roundPlayersB = fillRoundSlots(teamB, slotsPerTeam, playCountsB);
+                    let pairsA = formPairs(roundPlayersA, partnerHistoryA);
+                    let pairsB = formPairs(roundPlayersB, partnerHistoryB);
+                    
+                    let sortedPairsA = pairsA.map(pair => ({ pair, avgRank: (pair[0].originalRank + pair[1].originalRank)/2 })).sort((a,b)=>a.avgRank-b.avgRank);
+                    let sortedPairsB = pairsB.map(pair => ({ pair, avgRank: (pair[0].originalRank + pair[1].originalRank)/2 })).sort((a,b)=>a.avgRank-b.avgRank);
+                    
+                    for (let i = 0; i < matchesPerRound; i++) {
+                        roundMatches.push({
+                            teamA: sortedPairsA[i].pair,
+                            teamB: sortedPairsB[i].pair,
+                            winner: null,
+                            isManual: false
+                        });
+                    }
+                } else {
+                    // 4, 5 라운드: 수동 편성 (오더 싸움을 위해 빈칸으로 생성)
+                    for (let i = 0; i < matchesPerRound; i++) {
+                        roundMatches.push({
+                            teamA: [{name: '', originalRank: 99}, {name: '', originalRank: 99}],
+                            teamB: [{name: '', originalRank: 99}, {name: '', originalRank: 99}],
+                            winner: null,
+                            isManual: true
+                        });
+                    }
                 }
                 rounds.push(roundMatches);
             }
 
-            globalTournamentState.rounds = rounds;
-            renderBracket();
-            updateRealTimeResults(); // 초기 결과창 띄우기
+            window.globalTournamentState.rounds = rounds;
+            window.renderBracket();
+            window.updateRealTimeResults();
+            window.syncToCloud();
         }
 
-        // 대진표 화면에 그리기
-        function renderBracket() {
+        // 수동 편성 선수 업데이트
+        window.updateManualPlayer = function(rIdx, mIdx, teamStr, pIdx, newName) {
+            let match = window.globalTournamentState.rounds[rIdx][mIdx];
+            let teamList = teamStr === 'A' ? window.globalTournamentState.teamA : window.globalTournamentState.teamB;
+            
+            // 이름으로 기존 객체 검색, 없으면 빈 객체 할당
+            let playerObj = teamList.find(p => p.name === newName) || { name: newName, originalRank: 99 };
+            
+            if (teamStr === 'A') {
+                match.teamA[pIdx] = playerObj;
+            } else {
+                match.teamB[pIdx] = playerObj;
+            }
+            
+            window.updateRealTimeResults();
+            window.syncToCloud();
+        };
+
+        // 렌더링
+        window.renderBracket = function() {
             const container = document.getElementById('roundsContainer');
             container.innerHTML = ''; 
 
-            globalTournamentState.rounds.forEach((matches, roundIndex) => {
+            window.globalTournamentState.rounds.forEach((matches, roundIndex) => {
                 const roundDiv = document.createElement('div');
                 roundDiv.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print-break';
                 
                 const header = document.createElement('div');
-                header.className = 'bg-gray-50 border-b border-gray-200 px-4 py-3 font-bold text-gray-700';
-                header.innerText = `🏸 ${roundIndex + 1} 라운드`;
+                header.className = `border-b border-gray-200 px-4 py-3 font-bold ${roundIndex < 3 ? 'bg-gray-50 text-gray-700' : 'bg-indigo-50 text-indigo-700'}`;
+                header.innerHTML = `🏸 ${roundIndex + 1} 라운드 ${roundIndex >= 3 ? '<span class="text-xs font-normal text-indigo-500 ml-2">(직접 오더 편성)</span>' : ''}`;
                 roundDiv.appendChild(header);
 
                 const matchList = document.createElement('div');
@@ -312,46 +445,59 @@
                     const matchItem = document.createElement('div');
                     matchItem.className = 'flex flex-col md:flex-row items-center justify-between p-4 hover:bg-gray-50 gap-4 md:gap-0';
 
-                    // 경기 번호
                     const matchNum = document.createElement('div');
                     matchNum.className = 'text-xs text-gray-400 font-semibold w-full md:w-16 text-center md:text-left mb-2 md:mb-0';
                     matchNum.innerText = `Game ${matchIndex + 1}`;
 
-                    // A팀 영역 (승리 버튼 + 이름)
+                    // 드롭다운 생성 헬퍼
+                    const makeSelect = (teamStr, pIdx) => {
+                        const members = teamStr === 'A' ? window.globalTournamentState.teamA : window.globalTournamentState.teamB;
+                        const currName = teamStr === 'A' ? match.teamA[pIdx].name : match.teamB[pIdx].name;
+                        let html = `<select class="border border-gray-300 rounded p-1 text-sm bg-white shadow-sm outline-none focus:ring focus:ring-indigo-200 w-24" onchange="updateManualPlayer(${roundIndex}, ${matchIndex}, '${teamStr}', ${pIdx}, this.value)">`;
+                        html += `<option value="">선택</option>`;
+                        members.forEach(m => {
+                            html += `<option value="${m.name}" ${m.name === currName ? 'selected' : ''}>${m.name}</option>`;
+                        });
+                        html += `</select>`;
+                        return html;
+                    };
+
+                    // A팀
                     const teamAbox = document.createElement('div');
                     teamAbox.className = 'flex-1 flex items-center justify-center md:justify-end gap-3 w-full';
-                    
                     const btnA = document.createElement('button');
-                    btnA.id = `btn-${roundIndex}-${matchIndex}-A`;
                     btnA.className = `px-3 py-1 text-xs font-bold rounded shadow-sm border transition-colors ${match.winner === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'}`;
                     btnA.innerText = match.winner === 'A' ? '승리 ★' : '승리';
-                    btnA.onclick = () => toggleWinner(roundIndex, matchIndex, 'A');
+                    btnA.onclick = () => window.toggleWinner(roundIndex, matchIndex, 'A');
 
                     const namesA = document.createElement('div');
-                    namesA.className = `text-center md:text-right font-medium ${match.winner === 'B' ? 'text-gray-400' : 'text-blue-800'}`;
-                    namesA.innerHTML = `${match.teamA[0].name} <span class="text-gray-400 text-xs mx-0.5">&</span> ${match.teamA[1].name}`;
-
+                    namesA.className = `text-center md:text-right font-medium flex items-center gap-1 ${match.winner === 'B' ? 'opacity-50' : ''}`;
+                    if (match.isManual) {
+                        namesA.innerHTML = `${makeSelect('A', 0)} <span class="text-gray-400 text-xs">-</span> ${makeSelect('A', 1)}`;
+                    } else {
+                        namesA.innerHTML = `<span class="text-blue-800">${match.teamA[0].name}</span> <span class="text-gray-400 text-xs mx-0.5">&</span> <span class="text-blue-800">${match.teamA[1].name}</span>`;
+                    }
                     teamAbox.appendChild(btnA);
                     teamAbox.appendChild(namesA);
 
-                    // VS 마크
                     const vsMark = document.createElement('div');
                     vsMark.className = 'bg-gray-200 text-gray-600 text-xs font-bold px-2 py-1 rounded-md hidden md:block mx-4';
                     vsMark.innerText = 'VS';
 
-                    // B팀 영역 (이름 + 승리 버튼)
+                    // B팀
                     const teamBbox = document.createElement('div');
                     teamBbox.className = 'flex-1 flex items-center justify-center md:justify-start gap-3 w-full';
-                    
                     const namesB = document.createElement('div');
-                    namesB.className = `text-center md:text-left font-medium ${match.winner === 'A' ? 'text-gray-400' : 'text-red-800'}`;
-                    namesB.innerHTML = `${match.teamB[0].name} <span class="text-gray-400 text-xs mx-0.5">&</span> ${match.teamB[1].name}`;
-
+                    namesB.className = `text-center md:text-left font-medium flex items-center gap-1 ${match.winner === 'A' ? 'opacity-50' : ''}`;
+                    if (match.isManual) {
+                        namesB.innerHTML = `${makeSelect('B', 0)} <span class="text-gray-400 text-xs">-</span> ${makeSelect('B', 1)}`;
+                    } else {
+                        namesB.innerHTML = `<span class="text-red-800">${match.teamB[0].name}</span> <span class="text-gray-400 text-xs mx-0.5">&</span> <span class="text-red-800">${match.teamB[1].name}</span>`;
+                    }
                     const btnB = document.createElement('button');
-                    btnB.id = `btn-${roundIndex}-${matchIndex}-B`;
                     btnB.className = `px-3 py-1 text-xs font-bold rounded shadow-sm border transition-colors ${match.winner === 'B' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-200 hover:bg-red-50'}`;
                     btnB.innerText = match.winner === 'B' ? '승리 ★' : '승리';
-                    btnB.onclick = () => toggleWinner(roundIndex, matchIndex, 'B');
+                    btnB.onclick = () => window.toggleWinner(roundIndex, matchIndex, 'B');
 
                     teamBbox.appendChild(namesB);
                     teamBbox.appendChild(btnB);
@@ -371,78 +517,80 @@
             document.getElementById('finalResultArea').classList.remove('hidden');
         }
 
-        // 승리 팀 토글 기능
-        function toggleWinner(roundIdx, matchIdx, teamStr) {
-            let match = globalTournamentState.rounds[roundIdx][matchIdx];
+        window.toggleWinner = function(roundIdx, matchIdx, teamStr) {
+            let match = window.globalTournamentState.rounds[roundIdx][matchIdx];
             
-            // 이미 선택된 것을 다시 누르면 취소, 아니면 변경
-            if (match.winner === teamStr) {
-                match.winner = null;
-            } else {
-                match.winner = teamStr;
+            // 4, 5라운드 빈칸 승리 처리 방지
+            if (match.isManual) {
+                if (!match.teamA[0].name || !match.teamA[1].name || !match.teamB[0].name || !match.teamB[1].name) {
+                    alert("출전 선수를 모두 선택한 후 승패를 입력해주세요.");
+                    return;
+                }
             }
+
+            if (match.winner === teamStr) match.winner = null;
+            else match.winner = teamStr;
             
-            // UI 재렌더링
-            renderBracket();
-            updateRealTimeResults();
+            window.renderBracket();
+            window.updateRealTimeResults();
+            window.syncToCloud();
         }
 
-        // 실시간 결과 집계 및 업데이트
-        function updateRealTimeResults() {
-            let totalA = 0;
-            let totalB = 0;
-            let stats = {}; // { '팀-이름': { team, name, play, win, lose } }
+        window.updateRealTimeResults = function() {
+            let totalA = 0; let totalB = 0;
+            let stats = {}; 
 
-            // 선수 스탯 초기화
-            globalTournamentState.teamA.forEach(p => {
-                stats[`A-${p.name}`] = { team: 'A', name: p.name, play: 0, win: 0, lose: 0 };
-            });
-            globalTournamentState.teamB.forEach(p => {
-                stats[`B-${p.name}`] = { team: 'B', name: p.name, play: 0, win: 0, lose: 0 };
-            });
+            window.globalTournamentState.teamA.forEach(p => { stats[`A-${p.name}`] = { team: 'A', name: p.name, play: 0, win: 0, lose: 0 }; });
+            window.globalTournamentState.teamB.forEach(p => { stats[`B-${p.name}`] = { team: 'B', name: p.name, play: 0, win: 0, lose: 0 }; });
 
-            // 결과 집계
-            globalTournamentState.rounds.forEach(round => {
+            window.globalTournamentState.rounds.forEach(round => {
                 round.forEach(match => {
-                    // 출전 횟수 증가
-                    match.teamA.forEach(p => { if(stats[`A-${p.name}`]) stats[`A-${p.name}`].play++; });
-                    match.teamB.forEach(p => { if(stats[`B-${p.name}`]) stats[`B-${p.name}`].play++; });
+                    // 선택된 선수만 카운트 (수동 오더 빈칸 제외)
+                    let a1 = match.teamA[0].name; let a2 = match.teamA[1].name;
+                    let b1 = match.teamB[0].name; let b2 = match.teamB[1].name;
+                    
+                    let isReady = a1 && a2 && b1 && b2;
+
+                    if (a1 && stats[`A-${a1}`]) stats[`A-${a1}`].play++;
+                    if (a2 && stats[`A-${a2}`]) stats[`A-${a2}`].play++;
+                    if (b1 && stats[`B-${b1}`]) stats[`B-${b1}`].play++;
+                    if (b2 && stats[`B-${b2}`]) stats[`B-${b2}`].play++;
 
                     if (match.winner === 'A') {
                         totalA++;
-                        match.teamA.forEach(p => { if(stats[`A-${p.name}`]) stats[`A-${p.name}`].win++; });
-                        match.teamB.forEach(p => { if(stats[`B-${p.name}`]) stats[`B-${p.name}`].lose++; });
+                        if(a1 && stats[`A-${a1}`]) stats[`A-${a1}`].win++;
+                        if(a2 && stats[`A-${a2}`]) stats[`A-${a2}`].win++;
+                        if(b1 && stats[`B-${b1}`]) stats[`B-${b1}`].lose++;
+                        if(b2 && stats[`B-${b2}`]) stats[`B-${b2}`].lose++;
                     } else if (match.winner === 'B') {
                         totalB++;
-                        match.teamB.forEach(p => { if(stats[`B-${p.name}`]) stats[`B-${p.name}`].win++; });
-                        match.teamA.forEach(p => { if(stats[`A-${p.name}`]) stats[`A-${p.name}`].lose++; });
+                        if(b1 && stats[`B-${b1}`]) stats[`B-${b1}`].win++;
+                        if(b2 && stats[`B-${b2}`]) stats[`B-${b2}`].win++;
+                        if(a1 && stats[`A-${a1}`]) stats[`A-${a1}`].lose++;
+                        if(a2 && stats[`A-${a2}`]) stats[`A-${a2}`].lose++;
                     }
                 });
             });
 
-            // 스코어 보드 업데이트
             document.getElementById('scoreA').innerText = totalA;
             document.getElementById('scoreB').innerText = totalB;
 
-            // 스탯 배열로 변환 후 정렬 (승률 > 승리수 > 경기수 > 팀순)
             let statArray = Object.values(stats);
             statArray.sort((a, b) => {
                 let rateA = a.play > 0 ? a.win / a.play : 0;
                 let rateB = b.play > 0 ? b.win / b.play : 0;
-                if (rateB !== rateA) return rateB - rateA; // 승률 내림차순
-                if (b.win !== a.win) return b.win - a.win; // 승리수 내림차순
-                if (b.play !== a.play) return b.play - a.play; // 경기수 내림차순
+                if (rateB !== rateA) return rateB - rateA; 
+                if (b.win !== a.win) return b.win - a.win; 
+                if (b.play !== a.play) return b.play - a.play; 
                 return a.team.localeCompare(b.team);
             });
 
-            // 테이블 렌더링
             const tbody = document.getElementById('playerStatsBody');
             tbody.innerHTML = '';
             
             statArray.forEach(st => {
                 const tr = document.createElement('tr');
                 tr.className = 'bg-white border-b hover:bg-gray-50';
-                
                 let rateStr = st.play > 0 ? Math.round((st.win / st.play) * 100) + '%' : '0%';
                 let teamColor = st.team === 'A' ? 'text-blue-600 bg-blue-50' : 'text-red-600 bg-red-50';
                 
