@@ -20,10 +20,12 @@
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-10">
 
     <div class="max-w-4xl mx-auto pt-6 px-4 relative">
+        <!-- 관리자 모드 토글 버튼 -->
         <button id="adminBtn" onclick="openAdminModal()" class="absolute top-6 right-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1.5 px-3 rounded text-xs transition-colors shadow-sm z-10 no-print">
             🔒 관리자 로그인
         </button>
 
+        <!-- 헤더 -->
         <div class="text-center mb-6 pt-4">
             <div class="flex justify-center items-center gap-2 mb-2">
                 <h1 class="text-3xl font-bold text-indigo-700">🏸 고배모 경기 진행 🏸</h1>
@@ -35,13 +37,16 @@
             <p class="text-gray-600 text-sm">진행 상황이 실시간으로 공유됩니다.</p>
         </div>
 
+        <!-- 입력 영역 -->
         <div class="bg-white rounded-xl shadow-md p-6 mb-8 no-print">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- A팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-blue-600 mb-2">A팀 명단</label>
                     <textarea id="teamA" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-colors" placeholder="관리자 모드에서 입력 가능합니다." onchange="syncTextAreas()"></textarea>
                     <p class="text-xs text-gray-500 mt-1 text-right">총 인원: <span id="countA" class="font-bold">0</span>명</p>
                 </div>
+                <!-- B팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-red-600 mb-2">B팀 명단</label>
                     <textarea id="teamB" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm transition-colors" placeholder="관리자 모드에서 입력 가능합니다." onchange="syncTextAreas()"></textarea>
@@ -59,6 +64,7 @@
             </div>
         </div>
 
+        <!-- 대진표 결과 출력 영역 -->
         <div id="resultArea" class="hidden">
             <div class="flex flex-col sm:flex-row justify-between items-end mb-4 print-break">
                 <div>
@@ -75,6 +81,7 @@
             <div id="roundsContainer" class="space-y-6"></div>
         </div>
 
+        <!-- 실시간 경기 결과 -->
         <div id="finalResultArea" class="hidden mt-12 bg-white rounded-xl shadow-lg p-6 border-t-4 border-indigo-500 print-break">
             <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">🏆 실시간 경기 결과</h2>
             
@@ -112,6 +119,7 @@
         </div>
     </div>
 
+    <!-- 커스텀 모달 영역 -->
     <div id="customAlert" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
             <h3 class="text-lg font-bold text-gray-900 mb-4">알림</h3>
@@ -389,7 +397,7 @@
                     
                     let distA = Math.abs(a.originalRank - midRank);
                     let distB = Math.abs(b.originalRank - midRank);
-                    if (distA !== distB) return distB - distA; // 거리가 먼 사람(양 끝단) 우선
+                    if (distA !== distB) return distB - distA; 
                     
                     return a.originalRank - b.originalRank;
                 });
@@ -400,24 +408,20 @@
                     extraPlayCounts[p.name] = (extraPlayCounts[p.name] || 0) + 1;
                 }
             }
-            // 매칭 전 정렬은 무작위성 방지를 위해 원본 순서로 유지
             return selected.sort((a, b) => a.originalRank - b.originalRank);
         }
 
-        // [핵심 변경] 중간 실력자를 먼저 빼두어 중복 출전자와 매칭하는 알고리즘
+        // [핵심 변경 1] 중복 출전자는 가운데 선수와 먼저 짝을 짓고, 나머지는 '완전 탐색(DFS)'으로 파트너 중복을 0건으로 만듦
         function formPairs(players, history, originalTeamSize) {
-            let pairs = [];
-            let unassigned = [...players];
+            let extras = players.filter(p => p.isExtra);
+            let regulars = players.filter(p => !p.isExtra);
+            let fixedPairs = [];
 
-            // 1. 중복 출전 선수(isExtra)와 일반 선수 분리
-            let extras = unassigned.filter(p => p.isExtra);
-            let regulars = unassigned.filter(p => !p.isExtra);
-
-            // 중복 출전 선수가 있을 경우, 중간 실력자와 우선 매칭
+            // 1. 중복 출전 선수가 있을 경우, '중간 실력' 선수와 우선 매칭
             if (extras.length > 0) {
-                let midRank = (originalTeamSize - 1) / 2; // 팀 명단 내 중간 랭크
+                let midRank = (originalTeamSize - 1) / 2;
 
-                // 일반 선수들을 '중간 랭크와의 거리가 가까운 순'으로 정렬
+                // 일반 선수들을 중간 실력에 가까운 순서로 정렬
                 regulars.sort((a, b) => {
                     let distA = Math.abs(a.originalRank - midRank);
                     let distB = Math.abs(b.originalRank - midRank);
@@ -425,42 +429,111 @@
                     return a.originalRank - b.originalRank;
                 });
 
-                // 각 중복 출전 선수와 가장 가운데 있는 일반 선수를 짝지음
                 extras.forEach(extra => {
-                    if (regulars.length > 0) {
-                        let midPlayer = regulars.shift(); // 가장 중간 실력자 추출 (대진 로직에서 제외됨)
-                        pairs.push([midPlayer, extra]);
-                        
+                    // 한 번도 파트너를 안 해본 중간 실력자 탐색
+                    let bestRegIdx = -1;
+                    for (let i = 0; i < regulars.length; i++) {
+                        let reg = regulars[i];
+                        if (reg.name === extra.name) continue; // 본인 제외
+                        let key = [reg.name, extra.name].sort().join("|");
+                        if (!history[key]) {
+                            bestRegIdx = i;
+                            break;
+                        }
+                    }
+                    
+                    // 만약 전부 파트너를 해본 극단적인 경우 가장 가까운 사람과 배정
+                    if (bestRegIdx === -1) {
+                        for (let i = 0; i < regulars.length; i++) {
+                             if (regulars[i].name !== extra.name) {
+                                 bestRegIdx = i;
+                                 break;
+                             }
+                        }
+                    }
+
+                    if (bestRegIdx !== -1) {
+                        let midPlayer = regulars.splice(bestRegIdx, 1)[0];
+                        fixedPairs.push([midPlayer, extra]);
                         let finalKey = [midPlayer.name, extra.name].sort().join("|");
                         history[finalKey] = (history[finalKey] || 0) + 1;
                     }
                 });
             }
 
-            // 2. 남은 일반 선수들을 원래 실력순으로 원복 후 그리디 매칭
-            regulars.sort((a, b) => a.originalRank - b.originalRank);
+            // 2. 남은 일반 선수들끼리의 매칭 (완전 탐색 DFS 백트래킹 적용)
+            regulars.sort((a, b) => a.originalRank - b.originalRank); // 다시 실력순 정렬
 
-            while (regulars.length >= 2) {
-                let p1 = regulars.shift();
-                let bestP2Idx = -1, bestScore = Infinity;
-                
-                for (let i = 0; i < regulars.length; i++) {
-                    let p2 = regulars[i];
-                    if (p1.name === p2.name) continue; 
+            // 만약 인원이 너무 많아 브라우저가 멈출 우려가 있으면(일반 인원이 14명 초과) 기존 그리디 방식 사용, 보통의 동호회 사이즈(12명 이하)는 DFS로 완벽한 조합 탐색
+            if (regulars.length > 0 && regulars.length <= 14) {
+                let bestPairs = null;
+                let minScore = Infinity;
 
-                    let pairKey = [p1.name, p2.name].sort().join("|");
-                    let score = ((history[pairKey] || 0) * 10000) + Math.abs(p1.originalRank - p2.originalRank);
-                    if (score < bestScore) { bestScore = score; bestP2Idx = i; }
+                function dfs(currentPairs, remaining, currentScore) {
+                    if (currentScore >= minScore) return; // 가지치기(최적화)
+
+                    if (remaining.length === 0) {
+                        minScore = currentScore;
+                        bestPairs = currentPairs;
+                        return;
+                    }
+
+                    let p1 = remaining[0];
+                    for (let i = 1; i < remaining.length; i++) {
+                        let p2 = remaining[i];
+                        if (p1.name === p2.name) continue;
+
+                        let key = [p1.name, p2.name].sort().join("|");
+                        let h = history[key] || 0;
+                        
+                        // 파트너 중복(history)에 엄청난 페널티 부여, 그 다음이 실력 차이
+                        let pairScore = (h * 100000) + Math.abs(p1.originalRank - p2.originalRank);
+                        
+                        let newPairs = [...currentPairs, [p1, p2]];
+                        let newRemaining = [];
+                        for(let j = 1; j < remaining.length; j++) {
+                            if(j !== i) newRemaining.push(remaining[j]);
+                        }
+                        
+                        dfs(newPairs, newRemaining, currentScore + pairScore);
+                    }
                 }
 
-                if (bestP2Idx === -1) bestP2Idx = 0; 
+                dfs([], regulars, 0);
 
-                let p2 = regulars.splice(bestP2Idx, 1)[0];
-                pairs.push([p1, p2]);
-                let finalKey = [p1.name, p2.name].sort().join("|");
-                history[finalKey] = (history[finalKey] || 0) + 1;
+                if (bestPairs) {
+                    bestPairs.forEach(pair => {
+                        fixedPairs.push(pair);
+                        let finalKey = [pair[0].name, pair[1].name].sort().join("|");
+                        history[finalKey] = (history[finalKey] || 0) + 1;
+                    });
+                }
+            } 
+            else if (regulars.length > 14) {
+                // 안전장치(Fallback): 혹시 명단이 너무 많을 경우의 기존 로직
+                let unassigned = [...regulars];
+                while (unassigned.length >= 2) {
+                    let p1 = unassigned.shift();
+                    let bestP2Idx = -1, bestScore = Infinity;
+                    
+                    for (let i = 0; i < unassigned.length; i++) {
+                        let p2 = unassigned[i];
+                        if (p1.name === p2.name) continue; 
+
+                        let pairKey = [p1.name, p2.name].sort().join("|");
+                        let score = ((history[pairKey] || 0) * 100000) + Math.abs(p1.originalRank - p2.originalRank);
+                        if (score < bestScore) { bestScore = score; bestP2Idx = i; }
+                    }
+
+                    if (bestP2Idx === -1) bestP2Idx = 0; 
+                    let p2 = unassigned.splice(bestP2Idx, 1)[0];
+                    fixedPairs.push([p1, p2]);
+                    let finalKey = [p1.name, p2.name].sort().join("|");
+                    history[finalKey] = (history[finalKey] || 0) + 1;
+                }
             }
-            return pairs;
+
+            return fixedPairs;
         }
 
         window.reqGenerateBracket = function() {
@@ -468,7 +541,8 @@
             
             let hasStarted = false;
             for (let rObj of window.globalTournamentState.rounds) {
-                for (let m of rObj.matches) { if (m.winner !== null) hasStarted = true; }
+                let matches = rObj.matches || rObj;
+                for (let m of matches) { if (m.winner !== null) hasStarted = true; }
             }
 
             if (hasStarted) {
@@ -508,7 +582,6 @@
                     let roundPlayersA = fillRoundSlots(teamA, slotsPerTeam, extraCountsA);
                     let roundPlayersB = fillRoundSlots(teamB, slotsPerTeam, extraCountsB);
                     
-                    // 파트너 생성 함수에 원본 팀 사이즈를 인자로 전달
                     let pairsA = formPairs(roundPlayersA, partnerHistoryA, teamA.length);
                     let pairsB = formPairs(roundPlayersB, partnerHistoryB, teamB.length);
                     
@@ -562,6 +635,7 @@
             container.innerHTML = ''; 
 
             window.globalTournamentState.rounds.forEach((roundObj, roundIndex) => {
+                const matches = roundObj.matches || roundObj;
                 const roundDiv = document.createElement('div');
                 roundDiv.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print-break';
                 
@@ -573,7 +647,7 @@
                 const matchList = document.createElement('div');
                 matchList.className = 'divide-y divide-gray-100';
 
-                roundObj.matches.forEach((match, matchIndex) => {
+                matches.forEach((match, matchIndex) => {
                     const matchItem = document.createElement('div');
                     matchItem.className = 'flex flex-col md:flex-row items-center justify-between p-4 hover:bg-gray-50 gap-4 md:gap-0';
 
@@ -658,7 +732,7 @@
             document.getElementById('finalResultArea').classList.remove('hidden');
         }
 
-        window.toggleWinner = function(roundIdx, matchIdx, teamStr) {
+        window.toggleWinner = async function(roundIdx, matchIdx, teamStr) {
             if (!window.isAdmin) return;
             
             let match = window.globalTournamentState.rounds[roundIdx].matches[matchIdx];
@@ -686,7 +760,8 @@
             window.globalTournamentState.teamB.forEach(p => { stats[`B-${p.name}`] = { team: 'B', name: p.name, play: 0, win: 0, lose: 0 }; });
 
             window.globalTournamentState.rounds.forEach(roundObj => {
-                roundObj.matches.forEach(match => {
+                const matches = roundObj.matches || roundObj;
+                matches.forEach(match => {
                     let a1 = match.teamA[0].name; let a2 = match.teamA[1].name;
                     let b1 = match.teamB[0].name; let b2 = match.teamB[1].name;
                     
