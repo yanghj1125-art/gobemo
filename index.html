@@ -20,12 +20,10 @@
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-10">
 
     <div class="max-w-4xl mx-auto pt-6 px-4 relative">
-        <!-- 관리자 모드 토글 버튼 -->
         <button id="adminBtn" onclick="openAdminModal()" class="absolute top-6 right-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1.5 px-3 rounded text-xs transition-colors shadow-sm z-10 no-print">
             🔒 관리자 로그인
         </button>
 
-        <!-- 헤더 -->
         <div class="text-center mb-6 pt-4">
             <div class="flex justify-center items-center gap-2 mb-2">
                 <h1 class="text-3xl font-bold text-indigo-700">🏸 고배모 경기 진행 🏸</h1>
@@ -37,16 +35,13 @@
             <p class="text-gray-600 text-sm">진행 상황이 실시간으로 공유됩니다.</p>
         </div>
 
-        <!-- 입력 영역 -->
         <div class="bg-white rounded-xl shadow-md p-6 mb-8 no-print">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- A팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-blue-600 mb-2">A팀 명단</label>
                     <textarea id="teamA" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-colors" placeholder="관리자 모드에서 입력 가능합니다." onchange="syncTextAreas()"></textarea>
                     <p class="text-xs text-gray-500 mt-1 text-right">총 인원: <span id="countA" class="font-bold">0</span>명</p>
                 </div>
-                <!-- B팀 입력 -->
                 <div>
                     <label class="block text-lg font-semibold text-red-600 mb-2">B팀 명단</label>
                     <textarea id="teamB" class="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm transition-colors" placeholder="관리자 모드에서 입력 가능합니다." onchange="syncTextAreas()"></textarea>
@@ -64,7 +59,6 @@
             </div>
         </div>
 
-        <!-- 대진표 결과 출력 영역 -->
         <div id="resultArea" class="hidden">
             <div class="flex flex-col sm:flex-row justify-between items-end mb-4 print-break">
                 <div>
@@ -81,7 +75,6 @@
             <div id="roundsContainer" class="space-y-6"></div>
         </div>
 
-        <!-- 실시간 경기 결과 -->
         <div id="finalResultArea" class="hidden mt-12 bg-white rounded-xl shadow-lg p-6 border-t-4 border-indigo-500 print-break">
             <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">🏆 실시간 경기 결과</h2>
             
@@ -119,7 +112,6 @@
         </div>
     </div>
 
-    <!-- 커스텀 모달 영역 -->
     <div id="customAlert" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
         <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
             <h3 class="text-lg font-bold text-gray-900 mb-4">알림</h3>
@@ -170,7 +162,6 @@
         let lastLocalUpdate = 0;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'github-badminton-app';
 
-        // --- 커스텀 모달 제어 함수들 ---
         window.showAlert = function(msg) {
             document.getElementById('alertMessage').innerText = msg;
             document.getElementById('customAlert').classList.remove('hidden');
@@ -382,7 +373,8 @@
         }
 
         function fillRoundSlots(team, requiredSlots, extraPlayCounts) {
-            let selected = [...team];
+            // [중요 수정] 전역 데이터를 오염시키지 않도록 무조건 새로운 복사본(Clone)으로 맵핑
+            let selected = team.map(p => ({ ...p, isExtra: false })); 
             let extrasNeeded = requiredSlots - team.length;
 
             if (extrasNeeded > 0) {
@@ -404,6 +396,7 @@
 
                 for (let i = 0; i < extrasNeeded; i++) {
                     let p = availableExtras[i % availableExtras.length];
+                    // 중복 출전 선수는 isExtra: true 마킹
                     selected.push({ ...p, isExtra: true });
                     extraPlayCounts[p.name] = (extraPlayCounts[p.name] || 0) + 1;
                 }
@@ -411,30 +404,30 @@
             return selected.sort((a, b) => a.originalRank - b.originalRank);
         }
 
-        // [핵심 변경 1] 중복 출전자는 가운데 선수와 먼저 짝을 짓고, 나머지는 '완전 탐색(DFS)'으로 파트너 중복을 0건으로 만듦
-        function formPairs(players, history, originalTeamSize) {
+        function formPairs(players, history, originalTeamSize, midPartnerCounts) {
             let extras = players.filter(p => p.isExtra);
             let regulars = players.filter(p => !p.isExtra);
             let fixedPairs = [];
 
-            // 1. 중복 출전 선수가 있을 경우, '중간 실력' 선수와 우선 매칭
             if (extras.length > 0) {
                 let midRank = (originalTeamSize - 1) / 2;
 
-                // 일반 선수들을 중간 실력에 가까운 순서로 정렬
                 regulars.sort((a, b) => {
+                    let countA = midPartnerCounts[a.name] || 0;
+                    let countB = midPartnerCounts[b.name] || 0;
+                    if (countA !== countB) return countA - countB;
+
                     let distA = Math.abs(a.originalRank - midRank);
                     let distB = Math.abs(b.originalRank - midRank);
-                    if (distA !== distB) return distA - distB;
+                    if (distA !== distB) return distA - distB; 
                     return a.originalRank - b.originalRank;
                 });
 
                 extras.forEach(extra => {
-                    // 한 번도 파트너를 안 해본 중간 실력자 탐색
                     let bestRegIdx = -1;
                     for (let i = 0; i < regulars.length; i++) {
                         let reg = regulars[i];
-                        if (reg.name === extra.name) continue; // 본인 제외
+                        if (reg.name === extra.name) continue; 
                         let key = [reg.name, extra.name].sort().join("|");
                         if (!history[key]) {
                             bestRegIdx = i;
@@ -442,7 +435,6 @@
                         }
                     }
                     
-                    // 만약 전부 파트너를 해본 극단적인 경우 가장 가까운 사람과 배정
                     if (bestRegIdx === -1) {
                         for (let i = 0; i < regulars.length; i++) {
                              if (regulars[i].name !== extra.name) {
@@ -454,23 +446,23 @@
 
                     if (bestRegIdx !== -1) {
                         let midPlayer = regulars.splice(bestRegIdx, 1)[0];
+                        // 중복 출전자(extra)와 중간 실력자(midPlayer)가 짝을 이룸
                         fixedPairs.push([midPlayer, extra]);
+                        midPartnerCounts[midPlayer.name] = (midPartnerCounts[midPlayer.name] || 0) + 1;
                         let finalKey = [midPlayer.name, extra.name].sort().join("|");
                         history[finalKey] = (history[finalKey] || 0) + 1;
                     }
                 });
             }
 
-            // 2. 남은 일반 선수들끼리의 매칭 (완전 탐색 DFS 백트래킹 적용)
-            regulars.sort((a, b) => a.originalRank - b.originalRank); // 다시 실력순 정렬
+            regulars.sort((a, b) => a.originalRank - b.originalRank);
 
-            // 만약 인원이 너무 많아 브라우저가 멈출 우려가 있으면(일반 인원이 14명 초과) 기존 그리디 방식 사용, 보통의 동호회 사이즈(12명 이하)는 DFS로 완벽한 조합 탐색
             if (regulars.length > 0 && regulars.length <= 14) {
                 let bestPairs = null;
                 let minScore = Infinity;
 
                 function dfs(currentPairs, remaining, currentScore) {
-                    if (currentScore >= minScore) return; // 가지치기(최적화)
+                    if (currentScore >= minScore) return; 
 
                     if (remaining.length === 0) {
                         minScore = currentScore;
@@ -486,7 +478,6 @@
                         let key = [p1.name, p2.name].sort().join("|");
                         let h = history[key] || 0;
                         
-                        // 파트너 중복(history)에 엄청난 페널티 부여, 그 다음이 실력 차이
                         let pairScore = (h * 100000) + Math.abs(p1.originalRank - p2.originalRank);
                         
                         let newPairs = [...currentPairs, [p1, p2]];
@@ -510,7 +501,6 @@
                 }
             } 
             else if (regulars.length > 14) {
-                // 안전장치(Fallback): 혹시 명단이 너무 많을 경우의 기존 로직
                 let unassigned = [...regulars];
                 while (unassigned.length >= 2) {
                     let p1 = unassigned.shift();
@@ -572,6 +562,8 @@
             teamA.forEach(p => extraCountsA[p.name] = 0);
             teamB.forEach(p => extraCountsB[p.name] = 0);
             const partnerHistoryA = {}; const partnerHistoryB = {};
+            
+            const midPartnerCountsA = {}; const midPartnerCountsB = {};
 
             const rounds = [];
 
@@ -582,8 +574,8 @@
                     let roundPlayersA = fillRoundSlots(teamA, slotsPerTeam, extraCountsA);
                     let roundPlayersB = fillRoundSlots(teamB, slotsPerTeam, extraCountsB);
                     
-                    let pairsA = formPairs(roundPlayersA, partnerHistoryA, teamA.length);
-                    let pairsB = formPairs(roundPlayersB, partnerHistoryB, teamB.length);
+                    let pairsA = formPairs(roundPlayersA, partnerHistoryA, teamA.length, midPartnerCountsA);
+                    let pairsB = formPairs(roundPlayersB, partnerHistoryB, teamB.length, midPartnerCountsB);
                     
                     let sortedPairsA = pairsA.map(pair => ({ pair, avgRank: (pair[0].originalRank + pair[1].originalRank)/2 })).sort((a,b)=>a.avgRank-b.avgRank);
                     let sortedPairsB = pairsB.map(pair => ({ pair, avgRank: (pair[0].originalRank + pair[1].originalRank)/2 })).sort((a,b)=>a.avgRank-b.avgRank);
@@ -599,8 +591,8 @@
                 } else {
                     for (let i = 0; i < matchesPerRound; i++) {
                         roundMatches.push({
-                            teamA: [{name: '', originalRank: 99}, {name: '', originalRank: 99}],
-                            teamB: [{name: '', originalRank: 99}, {name: '', originalRank: 99}],
+                            teamA: [{name: '', originalRank: 99, isExtra: false}, {name: '', originalRank: 99, isExtra: false}],
+                            teamB: [{name: '', originalRank: 99, isExtra: false}, {name: '', originalRank: 99, isExtra: false}],
                             winner: null,
                             isManual: true
                         });
@@ -621,10 +613,11 @@
             let match = window.globalTournamentState.rounds[rIdx].matches[mIdx];
             let teamList = teamStr === 'A' ? window.globalTournamentState.teamA : window.globalTournamentState.teamB;
             
-            let playerObj = teamList.find(p => p.name === newName) || { name: newName, originalRank: 99 };
+            let playerObj = teamList.find(p => p.name === newName);
+            let finalObj = playerObj ? { ...playerObj, isExtra: false } : { name: newName, originalRank: 99, isExtra: false };
             
-            if (teamStr === 'A') match.teamA[pIdx] = playerObj;
-            else match.teamB[pIdx] = playerObj;
+            if (teamStr === 'A') match.teamA[pIdx] = finalObj;
+            else match.teamB[pIdx] = finalObj;
             
             window.updateRealTimeResults();
             window.syncToCloud();
@@ -636,6 +629,7 @@
 
             window.globalTournamentState.rounds.forEach((roundObj, roundIndex) => {
                 const matches = roundObj.matches || roundObj;
+
                 const roundDiv = document.createElement('div');
                 roundDiv.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print-break';
                 
@@ -657,7 +651,8 @@
 
                     const makeSelect = (teamStr, pIdx) => {
                         const members = teamStr === 'A' ? window.globalTournamentState.teamA : window.globalTournamentState.teamB;
-                        const currName = teamStr === 'A' ? match.teamA[pIdx].name : match.teamB[pIdx].name;
+                        const matchTeam = teamStr === 'A' ? match.teamA : match.teamB;
+                        const currName = matchTeam[pIdx].name;
                         
                         const styleClass = window.isAdmin ? 'bg-white focus:ring focus:ring-indigo-200' : 'bg-transparent border-none text-gray-600 appearance-none cursor-default font-semibold pl-0 pr-0 text-center';
                         const disabledAttr = window.isAdmin ? '' : 'disabled';
@@ -762,27 +757,25 @@
             window.globalTournamentState.rounds.forEach(roundObj => {
                 const matches = roundObj.matches || roundObj;
                 matches.forEach(match => {
-                    let a1 = match.teamA[0].name; let a2 = match.teamA[1].name;
-                    let b1 = match.teamB[0].name; let b2 = match.teamB[1].name;
-                    
-                    if (a1 && stats[`A-${a1}`]) stats[`A-${a1}`].play++;
-                    if (a2 && stats[`A-${a2}`]) stats[`A-${a2}`].play++;
-                    if (b1 && stats[`B-${b1}`]) stats[`B-${b1}`].play++;
-                    if (b2 && stats[`B-${b2}`]) stats[`B-${b2}`].play++;
+                    if (match.winner === 'A') totalA++;
+                    else if (match.winner === 'B') totalB++;
 
-                    if (match.winner === 'A') {
-                        totalA++;
-                        if(a1 && stats[`A-${a1}`]) stats[`A-${a1}`].win++;
-                        if(a2 && stats[`A-${a2}`]) stats[`A-${a2}`].win++;
-                        if(b1 && stats[`B-${b1}`]) stats[`B-${b1}`].lose++;
-                        if(b2 && stats[`B-${b2}`]) stats[`B-${b2}`].lose++;
-                    } else if (match.winner === 'B') {
-                        totalB++;
-                        if(b1 && stats[`B-${b1}`]) stats[`B-${b1}`].win++;
-                        if(b2 && stats[`B-${b2}`]) stats[`B-${b2}`].win++;
-                        if(a1 && stats[`A-${a1}`]) stats[`A-${a1}`].lose++;
-                        if(a2 && stats[`A-${a2}`]) stats[`A-${a2}`].lose++;
-                    }
+                    // 중복 출전 여부에 관계없이 모든 경기를 카운트함
+                    const processPlayer = (p, teamStr) => {
+                        if (p && p.name) {
+                            let key = `${teamStr}-${p.name}`;
+                            if (stats[key]) {
+                                stats[key].play++;
+                                if (match.winner === teamStr) stats[key].win++;
+                                else if (match.winner && match.winner !== teamStr) stats[key].lose++;
+                            }
+                        }
+                    };
+
+                    processPlayer(match.teamA[0], 'A');
+                    processPlayer(match.teamA[1], 'A');
+                    processPlayer(match.teamB[0], 'B');
+                    processPlayer(match.teamB[1], 'B');
                 });
             });
 
